@@ -1,10 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { supabase } from '../lib/supabaseClient'
 
-// Importa as Views
 import HomeView from '../views/HomeView.vue'
 import ClientesView from '../views/ClientesView.vue'
-import ProdutosView from '../views/ProdutosView.vue' // <<--- A CORREÇÃO ESTÁ AQUI. O nome do arquivo está correto agora.
+import ProdutosView from '../views/produtos-view.vue' // CORRIGIDO
 import VendasView from '../views/VendasView.vue'
 import RelatorioView from '../views/RelatorioView.vue'
 import LoginView from '../views/LoginView.vue'
@@ -21,18 +20,15 @@ const router = createRouter({
   ]
 })
 
-// Guarda de Navegação Global
 router.beforeEach(async (to, from, next) => {
   const { data: { session } } = await supabase.auth.getSession();
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 
   if (requiresAuth && !session) {
     next({ name: 'login' });
-  } 
-  else if (!requiresAuth && session && to.name === 'login') {
+  } else if (!requiresAuth && session && to.name === 'login') {
     next({ name: 'home' });
-  } 
-  else {
+  } else {
     next();
   }
 });
