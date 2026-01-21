@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 
 import HomeView from '../views/HomeView.vue'
 import ClientesView from '../views/ClientesView.vue'
-import ProdutosView from '../views/produtos-view.vue' // CORRIGIDO
+import ProdutosView from '../views/produtos-view.vue' // CORRIGIDO para o nome que o Netlify tentou usar
 import VendasView from '../views/VendasView.vue'
 import RelatorioView from '../views/RelatorioView.vue'
 import LoginView from '../views/LoginView.vue'
