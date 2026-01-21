@@ -4,30 +4,53 @@ import { supabase } from '../lib/supabaseClient.js'
 
 const vendas = ref([])
 
+function abrirRota(endereco) {
+  if (!endereco) {
+    alert('Endereço não informado para este cliente')
+    return
+  }
+
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`
+  window.open(url, '_blank')
+}
+
+function chamarWhatsApp(telefone, nomeCliente) {
+  if (!telefone) {
+    alert('Telefone não informado para este cliente')
+    return
+  }
+
+  // Remove tudo que não for número
+  const numeroLimpo = telefone.replace(/\D/g, '')
+
+  const mensagem = `Olá ${nomeCliente}, estou passando para avisar sobre a entrega dos seus produtos 🧺🍓`
+
+  const url = `https://wa.me/55${numeroLimpo}?text=${encodeURIComponent(mensagem)}`
+  window.open(url, '_blank')
+}
+
 async function buscarVendas() {
   const { data } = await supabase
     .from('vendas')
-    .select('*, clientes(nome), produtos_v2(nome)')
+    .select(`
+      *,
+      clientes ( id, nome, endereco, telefone ),
+      produtos_v2 ( nome )
+    `)
     .order('created_at', { ascending: false })
 
-  if (data) {
-    vendas.value = data
-  }
+  if (data) vendas.value = data
 }
 
 async function alternarStatusEntrega(venda) {
   const novoStatus = !venda.entregue
-
   const { error } = await supabase
     .from('vendas')
     .update({ entregue: novoStatus })
     .eq('id', venda.id)
 
   if (!error) {
-    const index = vendas.value.findIndex(
-      v => v.id === venda.id
-    )
-
+    const index = vendas.value.findIndex(v => v.id === venda.id)
     if (index !== -1) {
       vendas.value[index].entregue = novoStatus
     }
@@ -45,6 +68,8 @@ const relatorioAgrupado = computed(() => {
     if (!agrupado[clienteId]) {
       agrupado[clienteId] = {
         nomeCliente: venda.clientes.nome,
+        endereco: venda.clientes.endereco,
+        telefone: venda.clientes.telefone,
         produtos: []
       }
     }
@@ -72,6 +97,27 @@ onMounted(() => {
       >
         <h2>{{ cliente.nomeCliente }}</h2>
 
+        <p class="endereco">
+          📍 {{ cliente.endereco || 'Endereço não informado' }}
+        </p>
+
+        <!-- BOTÕES DE AÇÃO -->
+        <div class="acoes">
+          <button
+            class="rota-button"
+            @click="abrirRota(cliente.endereco)"
+          >
+            🗺️ Abrir rota
+          </button>
+
+          <button
+            class="whatsapp-button"
+            @click="chamarWhatsApp(cliente.telefone, cliente.nomeCliente)"
+          >
+            💬 WhatsApp
+          </button>
+        </div>
+
         <ul>
           <li
             v-for="venda in cliente.produtos"
@@ -86,12 +132,11 @@ onMounted(() => {
             />
 
             <span class="produto-nome">
-              {{ venda.produtos_v2?.nome || 'N/A' }}
+              {{ venda.produtos_v2?.nome || 'Produto' }}
             </span>
 
             <span class="quantidade">
-              Qtd:
-              {{ venda.quantidade_caixas }}
+              Qtd: {{ venda.quantidade_caixas }}
             </span>
           </li>
         </ul>
@@ -112,7 +157,7 @@ h1 {
 
 .relatorio-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5rem;
 }
 
@@ -124,9 +169,49 @@ h1 {
 }
 
 h2 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.3rem;
   border-bottom: 2px solid hsla(160, 100%, 37%, 1);
   padding-bottom: 0.5rem;
+}
+
+.endereco {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 0.5rem;
+}
+
+.acoes {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.rota-button {
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.rota-button:hover {
+  background-color: #1557b0;
+}
+
+.whatsapp-button {
+  background-color: #25d366;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.whatsapp-button:hover {
+  background-color: #1ebe57;
 }
 
 ul {

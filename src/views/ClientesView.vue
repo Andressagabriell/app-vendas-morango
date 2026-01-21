@@ -6,6 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 const nome = ref('')
 const email = ref('')
 const telefone = ref('')
+const endereco = ref('')
 
 const clientes = ref([])
 const loading = ref(true)
@@ -19,25 +20,24 @@ async function buscarClientes() {
     .order('created_at', { ascending: false })
 
   if (data) clientes.value = data
-
   loading.value = false
 }
 
 async function cadastrarCliente() {
-  const { error } = await supabase
-    .from('clientes')
-    .insert([
-      {
-        nome: nome.value,
-        email: email.value,
-        telefone: telefone.value
-      }
-    ])
+  const { error } = await supabase.from('clientes').insert([
+    {
+      nome: nome.value,
+      email: email.value,
+      telefone: telefone.value,
+      endereco: endereco.value
+    }
+  ])
 
   if (!error) {
     nome.value = ''
     email.value = ''
     telefone.value = ''
+    endereco.value = ''
     await buscarClientes()
   }
 }
@@ -55,6 +55,22 @@ async function deletarCliente(idCliente) {
   }
 }
 
+// 📍 Abre endereço no Google Maps
+function abrirMapa(endereco) {
+  if (!endereco) return
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`
+  window.open(url, '_blank')
+}
+
+// 📲 Abre WhatsApp com número do cliente
+function abrirWhatsApp(telefone) {
+  if (!telefone) return
+
+  const numeroLimpo = telefone.replace(/\D/g, '')
+  const url = `https://wa.me/55${numeroLimpo}` // 55 = Brasil
+  window.open(url, '_blank')
+}
+
 onMounted(() => {
   buscarClientes()
 })
@@ -67,35 +83,30 @@ onMounted(() => {
     <h1>Cadastro de Clientes</h1>
 
     <div v-if="!loading">
-      <form
-        @submit.prevent="cadastrarCliente"
-        class="form-container"
-      >
+      <form class="form-container" @submit.prevent="cadastrarCliente">
+
         <div class="form-group">
           <label for="nome">Nome:</label>
-          <input
-            id="nome"
-            type="text"
-            v-model="nome"
-            required
-          />
+          <input id="nome" v-model="nome" type="text" required />
         </div>
 
         <div class="form-group">
           <label for="email">Email:</label>
-          <input
-            id="email"
-            type="email"
-            v-model="email"
-          />
+          <input id="email" v-model="email" type="email" />
         </div>
 
         <div class="form-group">
           <label for="telefone">Telefone:</label>
+          <input id="telefone" v-model="telefone" type="tel" placeholder="(11) 99999-9999" />
+        </div>
+
+        <div class="form-group">
+          <label for="endereco">Endereço:</label>
           <input
-            id="telefone"
-            type="tel"
-            v-model="telefone"
+            id="endereco"
+            v-model="endereco"
+            type="text"
+            placeholder="Rua, número, bairro, cidade"
           />
         </div>
 
@@ -108,17 +119,35 @@ onMounted(() => {
         <h2>Clientes Cadastrados</h2>
 
         <ul>
-          <li
-            v-for="cliente in clientes"
-            :key="cliente.id"
-          >
-            <strong>{{ cliente.nome }}</strong>
-            <small>{{ cliente.email || 'Sem email' }}</small>
-            <span>{{ cliente.telefone }}</span>
+          <li v-for="cliente in clientes" :key="cliente.id">
+            <div class="cliente-info">
+              <strong>{{ cliente.nome }}</strong>
+              <small>{{ cliente.email || 'Sem email' }}</small>
+              <span>{{ cliente.telefone || 'Sem telefone' }}</span>
+              <span class="endereco">
+                📍 {{ cliente.endereco || 'Sem endereço cadastrado' }}
+              </span>
+
+              <div class="acoes">
+                <button
+                  class="map-button"
+                  @click="abrirMapa(cliente.endereco)"
+                >
+                  📍 Mapa
+                </button>
+
+                <button
+                  class="whatsapp-button"
+                  @click="abrirWhatsApp(cliente.telefone)"
+                >
+                  📲 WhatsApp
+                </button>
+              </div>
+            </div>
 
             <button
-              @click="deletarCliente(cliente.id)"
               class="delete-button"
+              @click="deletarCliente(cliente.id)"
             >
               Deletar
             </button>
@@ -133,7 +162,7 @@ onMounted(() => {
 main {
   position: relative;
   padding: 2rem;
-  max-width: 600px;
+  max-width: 750px;
   margin: 0 auto;
 }
 
@@ -165,20 +194,27 @@ input {
 }
 
 button {
-  padding: 0.75rem;
+  padding: 0.6rem 1rem;
   border: none;
   border-radius: 4px;
-  background-color: hsla(160, 100%, 37%, 1);
-  color: white;
-  font-weight: bold;
   cursor: pointer;
+  font-weight: bold;
 }
 
 .delete-button {
   background-color: #e53e3e;
-  padding: 0.4rem 0.8rem;
+  color: white;
   font-size: 0.8rem;
-  margin-left: 1rem;
+}
+
+.map-button {
+  background-color: #3182ce;
+  color: white;
+}
+
+.whatsapp-button {
+  background-color: #25d366;
+  color: white;
 }
 
 ul {
@@ -189,10 +225,27 @@ ul {
 li {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 1rem;
   border: 1px solid #ccc;
   border-radius: 4px;
   margin-bottom: 1rem;
+}
+
+.cliente-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.acoes {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.endereco {
+  font-size: 0.85rem;
+  color: #555;
 }
 </style>
