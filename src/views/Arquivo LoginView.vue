@@ -15,7 +15,6 @@ async function signIn() {
   if (error) {
     alert(`Falha no login: ${error.message}`)
   } else {
-    // Redireciona para o Dashboard após o login bem-sucedido
     router.push('/')
   }
 }
@@ -62,4 +61,3 @@ label { display: block; margin-bottom: 0.5rem; }
 input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
 button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; }
 </style>
-
