@@ -8,17 +8,13 @@ const session = ref(null)
 
 async function signOut() {
   await supabase.auth.signOut()
-  // Redireciona para a página de login após o logout
   router.push('/login')
 }
 
 onMounted(() => {
-  // Verifica a sessão quando o app carrega
   supabase.auth.getSession().then(({ data }) => {
     session.value = data.session
   })
-
-  // Fica "ouvindo" por mudanças no estado de autenticação (login/logout)
   supabase.auth.onAuthStateChange((_, _session) => {
     session.value = _session
   })
@@ -26,9 +22,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- O header só aparece se o usuário estiver logado -->
   <header v-if="session">
     <div class="wrapper">
+      <div class="brand">
+        Meu Morango
+      </div>
       <nav>
         <RouterLink to="/">Dashboard</RouterLink>
         <RouterLink to="/clientes">Clientes</RouterLink>
@@ -44,10 +42,67 @@ onMounted(() => {
 </template>
 
 <style scoped>
-header { line-height: 1.5; max-height: 100vh; border-bottom: 1px solid #ccc; }
-nav { width: 100%; font-size: 1rem; text-align: center; padding: 1rem 0; }
-nav a { display: inline-block; padding: 0 1rem; border-left: 1px solid var(--color-border); color: var(--color-text); text-decoration: none; }
-nav a:first-of-type { border: 0; }
-nav a.router-link-exact-active { color: hsla(160, 100%, 37%, 1); font-weight: bold; }
-.logout-button { color: #e53e3e; }
+header {
+  line-height: 1.5;
+  border-bottom: 1px solid #ccc;
+  background-color: white;
+}
+
+.wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: hsla(160, 100%, 37%, 1);
+}
+
+nav {
+  font-size: 1rem;
+  text-align: right;
+  padding: 1rem 0;
+}
+
+nav a {
+  display: inline-block;
+  padding: 0 1rem;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+nav a:first-of-type {
+  border: 0;
+}
+
+nav a.router-link-exact-active {
+  color: hsla(160, 100%, 37%, 1);
+  font-weight: bold;
+}
+
+.logout-button {
+  color: #e53e3e;
+}
+</style>
+
+<!-- ESTILO GLOBAL PARA O FUNDO ADICIONADO AQUI -->
+<style>
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('https://www.transparenttextures.com/patterns/strawberries.png' );
+  background-repeat: repeat;
+  opacity: 0.08;
+  z-index: -1;
+}
 </style>
