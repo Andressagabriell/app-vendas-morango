@@ -5,41 +5,46 @@ import { supabase } from '../lib/supabaseClient.js'
 const nome = ref('')
 const email = ref('')
 const telefone = ref('')
+const endereco = ref('')
 
 const clientes = ref([])
+const loading = ref(false)
 
 async function buscarClientes() {
+  loading.value = true
   const { data, error } = await supabase
     .from('clientes')
     .select('*')
     .order('created_at', { ascending: false })
-
   if (error) console.error(error)
   if (data) clientes.value = data
+  loading.value = false
 }
 
 async function cadastrarCliente() {
-  if (!nome.value) return
+  if (!nome.value) return alert('Nome é obrigatório')
 
-  const { error } = await supabase
-    .from('clientes')
-    .insert([{
-      nome: nome.value,
-      email: email.value,
-      telefone: telefone.value
-    }])
+  const { error } = await supabase.from('clientes').insert([{
+    nome: nome.value,
+    email: email.value,
+    telefone: telefone.value,
+    endereco: endereco.value
+  }])
 
-  if (error) console.error(error)
-  else {
+  if (error) {
+    console.error(error)
+    alert('Erro ao cadastrar cliente')
+  } else {
     nome.value = ''
     email.value = ''
     telefone.value = ''
+    endereco.value = ''
     await buscarClientes()
   }
 }
 
 async function deletarCliente(id) {
-  if (!confirm('Tem certeza?')) return
+  if (!confirm('Tem certeza que deseja deletar este cliente?')) return
   const { error } = await supabase.from('clientes').delete().eq('id', id)
   if (error) console.error(error)
   await buscarClientes()
@@ -54,7 +59,9 @@ onMounted(() => {
   <main>
     <h1>Cadastro de Clientes</h1>
 
-    <form @submit.prevent="cadastrarCliente" class="form-container">
+    <div v-if="loading">Carregando...</div>
+
+    <form @submit.prevent="cadastrarCliente" v-else class="form-container">
       <div class="form-group">
         <label for="nome">Nome:</label>
         <input type="text" id="nome" v-model="nome" required />
@@ -70,17 +77,23 @@ onMounted(() => {
         <input type="tel" id="telefone" v-model="telefone" />
       </div>
 
+      <div class="form-group">
+        <label for="endereco">Endereço:</label>
+        <input type="text" id="endereco" v-model="endereco" placeholder="Rua, nº, bairro, cidade" />
+      </div>
+
       <button type="submit">Cadastrar Cliente</button>
     </form>
 
-    <div class="list-container">
+    <div class="list-container" v-if="clientes.length">
       <h2>Clientes Cadastrados</h2>
       <ul>
         <li v-for="cliente in clientes" :key="cliente.id">
           <div>
-            <strong>{{ cliente.nome }}</strong>
-            <span>{{ cliente.email || 'Sem email' }}</span>
-            <span>{{ cliente.telefone || 'Sem telefone' }}</span>
+            <strong>{{ cliente.nome }}</strong> | 
+            <span>{{ cliente.email || 'Sem email' }}</span> | 
+            <span>{{ cliente.telefone || 'Sem telefone' }}</span> | 
+            <span>{{ cliente.endereco || 'Sem endereço' }}</span>
           </div>
           <button @click="deletarCliente(cliente.id)">Deletar</button>
         </li>
@@ -92,12 +105,11 @@ onMounted(() => {
 <style scoped>
 main { padding: 2rem; max-width: 600px; margin: 0 auto; }
 h1, h2 { margin-bottom: 1.5rem; }
-.form-container { margin-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem; }
+.form-container { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
 .form-group { display: flex; flex-direction: column; }
-label { margin-bottom: 0.3rem; font-weight: bold; }
+label { font-weight: bold; margin-bottom: 0.3rem; }
 input { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-button { padding: 0.75rem; border: none; border-radius: 4px; background-color: #28a745; color: white; font-weight: bold; cursor: pointer; }
+button { padding: 0.75rem; border: none; border-radius: 4px; background-color: #17a2b8; color: white; font-weight: bold; cursor: pointer; }
 .list-container ul { list-style: none; padding: 0; }
-.list-container li { display: flex; justify-content: space-between; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 0.5rem; }
-.list-container li div { display: flex; flex-direction: column; gap: 0.2rem; }
+.list-container li { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 0.5rem; }
 </style>
