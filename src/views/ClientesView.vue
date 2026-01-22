@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
+import LoadingSpinner from '../components/LoadingSpinner.vue'
 
 const nome = ref('')
 const email = ref('')
@@ -8,29 +9,26 @@ const telefone = ref('')
 const endereco = ref('')
 
 const clientes = ref([])
+const loading = ref(true)
 
 async function buscarClientes() {
-  const { data, error } = await supabase
+  loading.value = true
+  const { data } = await supabase
     .from('clientes')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (!error && data) {
-    clientes.value = data
-  }
+  if (data) clientes.value = data
+  loading.value = false
 }
 
 async function cadastrarCliente() {
-  if (!nome.value || !telefone.value) return
-
-  const { error } = await supabase
-    .from('clientes')
-    .insert([{
-      nome: nome.value,
-      email: email.value,
-      telefone: telefone.value,
-      endereco: endereco.value
-    }])
+  const { error } = await supabase.from('clientes').insert([{
+    nome: nome.value,
+    email: email.value,
+    telefone: telefone.value,
+    endereco: endereco.value
+  }])
 
   if (!error) {
     nome.value = ''
@@ -41,18 +39,10 @@ async function cadastrarCliente() {
   }
 }
 
-async function deletarCliente(id) {
-  const confirmar = confirm('Tem certeza?')
-  if (!confirmar) return
-
-  const { error } = await supabase
-    .from('clientes')
-    .delete()
-    .eq('id', id)
-
-  if (!error) {
-    await buscarClientes()
-  }
+async function deletarCliente(idCliente) {
+  if (!confirm('Tem certeza?')) return
+  const { error } = await supabase.from('clientes').delete().eq('id', idCliente)
+  if (!error) await buscarClientes()
 }
 
 onMounted(() => {
@@ -62,89 +52,86 @@ onMounted(() => {
 
 <template>
   <main>
+    <LoadingSpinner v-if="loading" />
+
     <h1>Cadastro de Clientes</h1>
 
-    <form @submit.prevent="cadastrarCliente" class="form-container">
-      <div class="form-group">
-        <label>Nome</label>
-        <input v-model="nome" type="text" required />
+    <div v-if="!loading">
+      <form @submit.prevent="cadastrarCliente" class="form-container">
+
+        <div class="form-group">
+          <label for="nome">Nome:</label>
+          <input type="text" id="nome" v-model="nome" required />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" v-model="email" />
+        </div>
+
+        <div class="form-group">
+          <label for="telefone">Telefone:</label>
+          <input type="tel" id="telefone" v-model="telefone" />
+        </div>
+
+        <div class="form-group">
+          <label for="endereco">Endereço:</label>
+          <input 
+            type="text" 
+            id="endereco" 
+            v-model="endereco" 
+            placeholder="Rua, número, bairro, cidade"
+          />
+        </div>
+
+        <button type="submit">Cadastrar Cliente</button>
+      </form>
+
+      <div class="list-container">
+        <h2>Clientes Cadastrados</h2>
+        <ul>
+          <li v-for="cliente in clientes" :key="cliente.id">
+            <div class="cliente-info">
+              <strong>{{ cliente.nome }}</strong>
+              <small>{{ cliente.email || 'Sem email' }}</small>
+              <span>{{ cliente.telefone }}</span>
+              <span class="endereco">📍 {{ cliente.endereco || 'Sem endereço cadastrado' }}</span>
+            </div>
+            <button 
+              @click="deletarCliente(cliente.id)" 
+              class="delete-button"
+            >
+              Deletar
+            </button>
+          </li>
+        </ul>
       </div>
-
-      <div class="form-group">
-        <label>Email</label>
-        <input v-model="email" type="email" />
-      </div>
-
-      <div class="form-group">
-        <label>Telefone</label>
-        <input v-model="telefone" type="text" required />
-      </div>
-
-      <div class="form-group">
-        <label>Endereço</label>
-        <input v-model="endereco" type="text" />
-      </div>
-
-      <button type="submit">Cadastrar Cliente</button>
-    </form>
-
-    <div class="list-container" v-if="clientes.length">
-      <h2>Clientes Cadastrados</h2>
-      <ul>
-        <li v-for="cliente in clientes" :key="cliente.id">
-          <strong>{{ cliente.nome }}</strong>
-          <small>{{ cliente.email || 'Sem email' }}</small>
-          <span>{{ cliente.telefone }}</span>
-          <span>📍 {{ cliente.endereco || 'Sem endereço' }}</span>
-          <button @click="deletarCliente(cliente.id)" class="delete-button">Deletar</button>
-        </li>
-      </ul>
     </div>
   </main>
 </template>
 
 <style scoped>
 main {
+  position: relative;
   padding: 2rem;
   max-width: 600px;
-  margin: auto;
+  margin: 0 auto;
 }
 
-h1, h2 {
-  margin-bottom: 1rem;
-}
+h1, h2 { margin-bottom: 1.5rem; }
 
-.form-container {
-  margin-bottom: 2rem;
-}
+.form-container, .list-container { margin-top: 2rem; }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 1rem;
-}
+.form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
+label { margin-bottom: 0.5rem; font-weight: bold; }
+input { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
 
-input {
-  padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-}
+button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; }
+.delete-button { background-color: #e53e3e; padding: 0.4rem 0.8rem; font-size: 0.8rem; margin-left: 1rem; }
 
-button {
-  background-color: #16a34a;
-  color: white;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
+ul { list-style: none; padding: 0; }
+li { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; }
 
-.delete-button {
-  background-color: #dc2626;
-  padding: 0.5rem 0.75rem;
-  margin-left: 1rem;
-  color: white;
-  border: none;
-  border-radius: 4px;
-}
+.cliente-info { display: flex; flex-direction: column; gap: 0.2rem; }
+.endereco { font-size: 0.85rem; color: #555; }
 </style>

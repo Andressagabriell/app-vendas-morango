@@ -8,29 +8,31 @@ import VendasView from '../views/VendasView.vue'
 import RelatorioView from '../views/RelatorioView.vue'
 import LoginView from '../views/LoginView.vue'
 
+const routes = [
+  { path: '/login', name: 'login', component: LoginView },
+  { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
+  { path: '/clientes', name: 'clientes', component: ClientesView, meta: { requiresAuth: true } },
+  { path: '/produtos', name: 'produtos', component: ProdutosView, meta: { requiresAuth: true } },
+  { path: '/vendas', name: 'vendas', component: VendasView, meta: { requiresAuth: true } },
+  { path: '/relatorio', name: 'relatorio', component: RelatorioView, meta: { requiresAuth: true } }
+]
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    { path: '/login', name: 'login', component: LoginView },
-    { path: '/', name: 'home', component: HomeView, meta: { requiresAuth: true } },
-    { path: '/clientes', name: 'clientes', component: ClientesView, meta: { requiresAuth: true } },
-    { path: '/produtos', name: 'produtos', component: ProdutosView, meta: { requiresAuth: true } },
-    { path: '/vendas', name: 'vendas', component: VendasView, meta: { requiresAuth: true } },
-    { path: '/relatorio', name: 'relatorio', component: RelatorioView, meta: { requiresAuth: true } }
-  ]
+  routes
 })
 
 router.beforeEach(async (to, from, next) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+  const { data: { session } } = await supabase.auth.getSession()
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
   if (requiresAuth && !session) {
-    next({ name: 'login' });
+    next({ name: 'login' })
   } else if (!requiresAuth && session && to.name === 'login') {
-    next({ name: 'home' });
+    next({ name: 'home' })
   } else {
-    next();
+    next()
   }
-});
+})
 
 export default router
