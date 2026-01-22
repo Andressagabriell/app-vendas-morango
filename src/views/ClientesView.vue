@@ -1,4 +1,3 @@
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
@@ -6,13 +5,10 @@ import { supabase } from '../lib/supabaseClient.js'
 const nome = ref('')
 const email = ref('')
 const telefone = ref('')
-const endereco = ref('')
 
 const clientes = ref([])
-const loading = ref(false)
 
 async function buscarClientes() {
-  loading.value = true
   const { data, error } = await supabase
     .from('clientes')
     .select('*')
@@ -20,33 +16,26 @@ async function buscarClientes() {
 
   if (error) console.error(error)
   if (data) clientes.value = data
-  loading.value = false
 }
 
 async function cadastrarCliente() {
   if (!nome.value) return
-  loading.value = true
 
   const { error } = await supabase
     .from('clientes')
     .insert([{
       nome: nome.value,
       email: email.value,
-      telefone: telefone.value,
-      endereco: endereco.value
+      telefone: telefone.value
     }])
 
-  if (error) {
-    console.error(error)
-  } else {
+  if (error) console.error(error)
+  else {
     nome.value = ''
     email.value = ''
     telefone.value = ''
-    endereco.value = ''
     await buscarClientes()
   }
-
-  loading.value = false
 }
 
 async function deletarCliente(id) {
@@ -81,14 +70,7 @@ onMounted(() => {
         <input type="tel" id="telefone" v-model="telefone" />
       </div>
 
-      <div class="form-group">
-        <label for="endereco">Endereço:</label>
-        <input type="text" id="endereco" v-model="endereco" placeholder="Rua, número, bairro, cidade" />
-      </div>
-
-      <button type="submit" :disabled="loading">
-        {{ loading ? 'Cadastrando...' : 'Cadastrar Cliente' }}
-      </button>
+      <button type="submit">Cadastrar Cliente</button>
     </form>
 
     <div class="list-container">
@@ -99,7 +81,6 @@ onMounted(() => {
             <strong>{{ cliente.nome }}</strong>
             <span>{{ cliente.email || 'Sem email' }}</span>
             <span>{{ cliente.telefone || 'Sem telefone' }}</span>
-            <span>{{ cliente.endereco || 'Sem endereço' }}</span>
           </div>
           <button @click="deletarCliente(cliente.id)">Deletar</button>
         </li>
@@ -116,7 +97,6 @@ h1, h2 { margin-bottom: 1.5rem; }
 label { margin-bottom: 0.3rem; font-weight: bold; }
 input { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
 button { padding: 0.75rem; border: none; border-radius: 4px; background-color: #28a745; color: white; font-weight: bold; cursor: pointer; }
-button:disabled { background-color: #6c757d; cursor: not-allowed; }
 .list-container ul { list-style: none; padding: 0; }
 .list-container li { display: flex; justify-content: space-between; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 0.5rem; }
 .list-container li div { display: flex; flex-direction: column; gap: 0.2rem; }
