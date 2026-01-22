@@ -26,13 +26,9 @@ router.beforeEach(async (to, from, next) => {
   const { data: { session } } = await supabase.auth.getSession()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
-  if (requiresAuth && !session) {
-    next({ name: 'login' })
-  } else if (!requiresAuth && session && to.name === 'login') {
-    next({ name: 'home' })
-  } else {
-    next()
-  }
+  if (requiresAuth && !session) next({ name: 'login' })
+  else if (!requiresAuth && session && to.name === 'login') next({ name: 'home' })
+  else next()
 })
 
 export default router
