@@ -86,7 +86,7 @@ onMounted(() => {
     <h1>Cadastro de Clientes</h1>
 
     <div v-if="!loading">
-      <form @submit.prevent="cadastrarCliente" class="form-container">
+      <form @submit.prevent="() => { alert('Botão funcionando'); cadastrarCliente() }" class="form-container">
         <div class="form-group">
           <label for="nome">Nome:</label>
           <input type="text" id="nome" v-model="nome" required />
