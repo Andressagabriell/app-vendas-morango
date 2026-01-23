@@ -35,8 +35,8 @@ const dadosGraficoVendas = computed(() => {
   for (const venda of vendas.value) {
     const dataVenda = new Date(venda.created_at)
     if (dataVenda >= primeiroDiaSemana) {
-      const diaDaSemana = dataVenda.getDay()
-      data[diaDaSemana] += venda.quantidade_caixas
+      const dia = dataVenda.getDay()
+      data[dia] += venda.quantidade_caixas
     }
   }
 
@@ -45,7 +45,7 @@ const dadosGraficoVendas = computed(() => {
     datasets: [
       {
         label: 'Caixas Vendidas na Semana',
-        backgroundColor: '#42b883',
+        backgroundColor: '#28a745',
         data
       }
     ]
@@ -56,7 +56,6 @@ const monitoramentoClientes = computed(() => {
   const monitor = {}
 
   const hoje = new Date()
-
   const inicioSemanaAtual = new Date(
     new Date().setDate(hoje.getDate() - hoje.getDay())
   )
@@ -70,10 +69,9 @@ const monitoramentoClientes = computed(() => {
   for (const venda of vendas.value) {
     if (!venda.clientes) continue
 
-    const clienteId = venda.clientes.id
-
-    if (!monitor[clienteId]) {
-      monitor[clienteId] = {
+    const id = venda.clientes.id
+    if (!monitor[id]) {
+      monitor[id] = {
         nome: venda.clientes.nome,
         semanaAtual: 0,
         semanaAnterior: 0
@@ -81,11 +79,10 @@ const monitoramentoClientes = computed(() => {
     }
 
     const dataVenda = new Date(venda.created_at)
-
     if (dataVenda >= inicioSemanaAtual) {
-      monitor[clienteId].semanaAtual += venda.quantidade_caixas
+      monitor[id].semanaAtual += venda.quantidade_caixas
     } else if (dataVenda >= inicioSemanaAnterior) {
-      monitor[clienteId].semanaAnterior += venda.quantidade_caixas
+      monitor[id].semanaAnterior += venda.quantidade_caixas
     }
   }
 
@@ -121,7 +118,6 @@ onMounted(() => {
 
       <div class="card">
         <h2>Monitoramento de Clientes</h2>
-
         <ul class="monitor-list">
           <li
             v-for="cliente in monitoramentoClientes"
@@ -146,21 +142,15 @@ onMounted(() => {
               <span
                 v-if="cliente.semanaAtual > cliente.semanaAnterior"
                 class="aumento"
-              >
-                ▲
-              </span>
+              >▲</span>
               <span
                 v-else-if="cliente.semanaAtual < cliente.semanaAnterior"
                 class="diminuicao"
-              >
-                ▼
-              </span>
+              >▼</span>
               <span
                 v-else
                 class="estavel"
-              >
-                =
-              </span>
+              >=</span>
             </div>
           </li>
         </ul>
@@ -223,15 +213,7 @@ h2 {
   text-align: center;
 }
 
-.aumento {
-  color: #4caf50;
-}
-
-.diminuicao {
-  color: #f44336;
-}
-
-.estavel {
-  color: #9e9e9e;
-}
+.aumento { color: #4caf50; }
+.diminuicao { color: #f44336; }
+.estavel { color: #9e9e9e; }
 </style>
