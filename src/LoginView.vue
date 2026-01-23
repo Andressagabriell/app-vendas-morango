@@ -8,16 +8,13 @@ const password = ref('')
 const router = useRouter()
 
 async function signIn() {
+  if (!email.value || !password.value) return
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email.value,
-    password: password.value,
+    password: password.value
   })
-  if (error) {
-    alert(`Falha no login: ${error.message}`)
-  } else {
-    // Redireciona para o Dashboard após o login bem-sucedido
-    router.push('/')
-  }
+  if (error) alert(`Falha no login: ${error.message}`)
+  else router.push('/')
 }
 </script>
 
@@ -52,7 +49,7 @@ async function signIn() {
   padding: 2rem;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   width: 100%;
   max-width: 400px;
 }
@@ -60,6 +57,5 @@ h1 { text-align: center; margin-bottom: 1.5rem; }
 .form-group { margin-bottom: 1rem; }
 label { display: block; margin-bottom: 0.5rem; }
 input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; }
+button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: #28a745; color: white; font-weight: bold; cursor: pointer; }
 </style>
-
