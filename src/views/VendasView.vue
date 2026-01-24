@@ -11,93 +11,90 @@ const produtoSelecionado = ref(null)
 const quantidadeCaixas = ref(1)
 
 async function buscarDadosIniciais() {
-  const { data: clientesData, error: clientesError } = await supabase.from('clientes').select('id, nome')
-  if (clientesError) console.error(clientesError)
+  // CORRIGIDO: Busca da nova tabela 'clientes_v2'
+  const { data: clientesData } = await supabase.from('clientes_v2').select('*')
   if (clientesData) clientes.value = clientesData
 
-  const { data: produtosData, error: produtosError } = await supabase.from('produtos_v2').select('id, nome')
-  if (produtosError) console.error(produtosError)
+  const { data: produtosData } = await supabase.from('produtos_v2').select('*')
   if (produtosData) produtos.value = produtosData
+
+  await buscarVendas()
 }
 
 async function buscarVendas() {
-  const { data, error } = await supabase
+  // CORRIGIDO: Busca o nome do cliente da nova tabela 'clientes_v2'
+  const { data } = await supabase
     .from('vendas')
-    .select('id, created_at, quantidade_caixas, clientes(id, nome), produtos_v2(id, nome)')
+    .select(`*, clientes:clientes_v2(nome), produtos_v2(nome)`) // A sintaxe 'clientes:clientes_v2(nome)' renomeia a relação para o código continuar funcionando
     .order('created_at', { ascending: false })
-
-  if (error) console.error(error)
   if (data) vendas.value = data
 }
 
 async function registrarVenda() {
-  if (!clienteSelecionado.value || !produtoSelecionado.value || quantidadeCaixas.value < 1) return
-
+  if (!clienteSelecionado.value || !produtoSelecionado.value) {
+    alert('Por favor, selecione um cliente e um produto.');
+    return;
+  }
   const { error } = await supabase.from('vendas').insert([{
     cliente_id: clienteSelecionado.value,
     produto_id: produtoSelecionado.value,
     quantidade_caixas: quantidadeCaixas.value
   }])
-
-  if (error) console.error(error)
-  else {
+  if (!error) {
+    await buscarVendas()
     clienteSelecionado.value = null
     produtoSelecionado.value = null
     quantidadeCaixas.value = 1
-    await buscarVendas()
   }
 }
 
-async function deletarVenda(id) {
-  if (!confirm('Tem certeza?')) return
-  const { error } = await supabase.from('vendas').delete().eq('id', id)
-  if (error) console.error(error)
-  await buscarVendas()
+async function deletarVenda(idVenda) {
+  const { error } = await supabase.from('vendas').delete().eq('id', idVenda)
+  if (!error) await buscarVendas()
 }
 
 onMounted(() => {
   buscarDadosIniciais()
-  buscarVendas()
 })
 </script>
 
 <template>
   <main>
     <h1>Registro de Vendas</h1>
-
     <form @submit.prevent="registrarVenda" class="form-container">
       <div class="form-group">
         <label for="cliente">Cliente:</label>
         <select id="cliente" v-model="clienteSelecionado" required>
-          <option value="" disabled>Selecione um cliente</option>
-          <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">{{ cliente.nome }}</option>
+          <option :value="null" disabled>Selecione um cliente</option>
+          <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
+            {{ cliente.nome }}
+          </option>
         </select>
       </div>
-
       <div class="form-group">
         <label for="produto">Produto:</label>
         <select id="produto" v-model="produtoSelecionado" required>
-          <option value="" disabled>Selecione um produto</option>
-          <option v-for="produto in produtos" :key="produto.id" :value="produto.id">{{ produto.nome }}</option>
+          <option :value="null" disabled>Selecione um produto</option>
+          <option v-for="produto in produtos" :key="produto.id" :value="produto.id">
+            {{ produto.nome }}
+          </option>
         </select>
       </div>
-
       <div class="form-group">
         <label for="quantidade">Quantidade de Caixas:</label>
         <input type="number" id="quantidade" v-model="quantidadeCaixas" min="1" required />
       </div>
-
       <button type="submit">Registrar Venda</button>
     </form>
-
     <div class="list-container">
       <h2>Vendas Recentes</h2>
       <ul>
         <li v-for="venda in vendas" :key="venda.id">
-          <span>Cliente: <strong>{{ venda.clientes.nome }}</strong></span>
+          <!-- O template não muda por causa da renomeação na query -->
+          <span>Cliente: <strong>{{ venda.clientes?.nome || 'N/A' }}</strong></span>
           <span>Produto: <strong>{{ venda.produtos_v2?.nome || 'N/A' }}</strong></span>
-          <span>Qtd: <strong>{{ venda.quantidade_caixas }}</strong></span>
-          <button @click="deletarVenda(venda.id)">Deletar</button>
+          <span>Caixas: <strong>{{ venda.quantidade_caixas }}</strong></span>
+          <button @click="deletarVenda(venda.id)" class="delete-button">Deletar</button>
         </li>
       </ul>
     </div>
@@ -105,13 +102,15 @@ onMounted(() => {
 </template>
 
 <style scoped>
-main { padding: 2rem; max-width: 700px; margin: 0 auto; }
+main { padding: 2rem; max-width: 600px; margin: 0 auto; }
 h1, h2 { margin-bottom: 1.5rem; }
-.form-container { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
-.form-group { display: flex; flex-direction: column; }
-label { margin-bottom: 0.3rem; font-weight: bold; }
+.form-container, .list-container { margin-top: 2rem; }
+.form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
+label { margin-bottom: 0.5rem; font-weight: bold; }
 input, select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-button { padding: 0.75rem; border: none; border-radius: 4px; background-color: #17a2b8; color: white; font-weight: bold; cursor: pointer; }
-.list-container ul { list-style: none; padding: 0; }
-.list-container li { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: center; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 0.5rem; }
+button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; }
+ul { list-style: none; padding: 0; }
+li { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; }
+.delete-button { background-color: #e53e3e; padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+.delete-button:hover { background-color: #c53030; }
 </style>
