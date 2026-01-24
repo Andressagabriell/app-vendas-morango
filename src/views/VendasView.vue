@@ -1,33 +1,50 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
+import LoadingSpinner from '../components/LoadingSpinner.vue'
 
+// --- ESTADO DA PÁGINA ---
 const clientes = ref([])
 const produtos = ref([])
 const vendas = ref([])
+const loading = ref(true)
 
+// --- ESTADO DO FORMULÁRIO ---
 const clienteSelecionado = ref(null)
 const produtoSelecionado = ref(null)
 const quantidadeCaixas = ref(1)
 
+// --- FUNÇÕES DE DADOS ---
+
 async function buscarDadosIniciais() {
-  // CORRIGIDO: Busca da nova tabela 'clientes_v2'
-  const { data: clientesData } = await supabase.from('clientes_v2').select('*')
-  if (clientesData) clientes.value = clientesData
+  loading.value = true;
 
-  const { data: produtosData } = await supabase.from('produtos_v2').select('*')
-  if (produtosData) produtos.value = produtosData
+  // Busca clientes da tabela correta
+  const { data: clientesData } = await supabase.from('clientes_v2').select('id, nome');
+  if (clientesData) clientes.value = clientesData;
 
-  await buscarVendas()
+  // Busca produtos da tabela correta
+  const { data: produtosData } = await supabase.from('produtos_v2').select('id, nome');
+  if (produtosData) produtos.value = produtosData;
+
+  await buscarVendas(); // Busca as vendas existentes
+  loading.value = false;
 }
 
 async function buscarVendas() {
-  // CORRIGIDO: Busca o nome do cliente da nova tabela 'clientes_v2'
+  // Faz a busca (join) com as tabelas corretas
   const { data } = await supabase
     .from('vendas')
-    .select(`*, clientes:clientes_v2(nome), produtos_v2(nome)`) // A sintaxe 'clientes:clientes_v2(nome)' renomeia a relação para o código continuar funcionando
-    .order('created_at', { ascending: false })
-  if (data) vendas.value = data
+    .select(`
+      id,
+      quantidade_caixas,
+      created_at,
+      cliente:clientes_v2(nome),
+      produto:produtos_v2(nome)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (data) vendas.value = data;
 }
 
 async function registrarVenda() {
@@ -35,74 +52,86 @@ async function registrarVenda() {
     alert('Por favor, selecione um cliente e um produto.');
     return;
   }
+
   const { error } = await supabase.from('vendas').insert([{
     cliente_id: clienteSelecionado.value,
     produto_id: produtoSelecionado.value,
     quantidade_caixas: quantidadeCaixas.value
-  }])
-  if (!error) {
-    await buscarVendas()
-    clienteSelecionado.value = null
-    produtoSelecionado.value = null
-    quantidadeCaixas.value = 1
+  }]);
+
+  if (error) {
+    console.error("Erro ao registrar venda:", error);
+    alert(`Falha ao registrar venda: ${error.message}`);
+  } else {
+    // Limpa o formulário e atualiza a lista de vendas
+    clienteSelecionado.value = null;
+    produtoSelecionado.value = null;
+    quantidadeCaixas.value = 1;
+    await buscarVendas();
+    alert('Venda registrada com sucesso!');
   }
 }
 
 async function deletarVenda(idVenda) {
-  const { error } = await supabase.from('vendas').delete().eq('id', idVenda)
-  if (!error) await buscarVendas()
+  if (!confirm('Tem certeza que deseja deletar esta venda?')) return;
+  const { error } = await supabase.from('vendas').delete().eq('id', idVenda);
+  if (!error) await buscarVendas();
 }
 
+// Busca os dados iniciais quando a página é montada
 onMounted(() => {
-  buscarDadosIniciais()
-})
+  buscarDadosIniciais();
+});
 </script>
 
 <template>
   <main>
-    <h1>Registro de Vendas</h1>
-    <form @submit.prevent="registrarVenda" class="form-container">
-      <div class="form-group">
-        <label for="cliente">Cliente:</label>
-        <select id="cliente" v-model="clienteSelecionado" required>
-          <option :value="null" disabled>Selecione um cliente</option>
-          <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
-            {{ cliente.nome }}
-          </option>
-        </select>
+    <LoadingSpinner v-if="loading" />
+    <div v-if="!loading">
+      <h1>Registro de Vendas</h1>
+      <form @submit.prevent="registrarVenda" class="form-container">
+        <div class="form-group">
+          <label for="cliente">Cliente:</label>
+          <select id="cliente" v-model="clienteSelecionado" required>
+            <option :value="null" disabled>Selecione um cliente</option>
+            <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
+              {{ cliente.nome }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="produto">Produto:</label>
+          <select id="produto" v-model="produtoSelecionado" required>
+            <option :value="null" disabled>Selecione um produto</option>
+            <option v-for="produto in produtos" :key="produto.id" :value="produto.id">
+              {{ produto.nome }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="quantidade">Quantidade de Caixas:</label>
+          <input type="number" id="quantidade" v-model="quantidadeCaixas" min="1" required />
+        </div>
+        <button type="submit">Registrar Venda</button>
+      </form>
+
+      <div class="list-container">
+        <h2>Vendas Recentes</h2>
+        <ul>
+          <li v-for="venda in vendas" :key="venda.id">
+            <span>Cliente: <strong>{{ venda.cliente?.nome || 'N/A' }}</strong></span>
+            <span>Produto: <strong>{{ venda.produto?.nome || 'N/A' }}</strong></span>
+            <span>Caixas: <strong>{{ venda.quantidade_caixas }}</strong></span>
+            <button @click="deletarVenda(venda.id)" class="delete-button">Deletar</button>
+          </li>
+        </ul>
       </div>
-      <div class="form-group">
-        <label for="produto">Produto:</label>
-        <select id="produto" v-model="produtoSelecionado" required>
-          <option :value="null" disabled>Selecione um produto</option>
-          <option v-for="produto in produtos" :key="produto.id" :value="produto.id">
-            {{ produto.nome }}
-          </option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="quantidade">Quantidade de Caixas:</label>
-        <input type="number" id="quantidade" v-model="quantidadeCaixas" min="1" required />
-      </div>
-      <button type="submit">Registrar Venda</button>
-    </form>
-    <div class="list-container">
-      <h2>Vendas Recentes</h2>
-      <ul>
-        <li v-for="venda in vendas" :key="venda.id">
-          <!-- O template não muda por causa da renomeação na query -->
-          <span>Cliente: <strong>{{ venda.clientes?.nome || 'N/A' }}</strong></span>
-          <span>Produto: <strong>{{ venda.produtos_v2?.nome || 'N/A' }}</strong></span>
-          <span>Caixas: <strong>{{ venda.quantidade_caixas }}</strong></span>
-          <button @click="deletarVenda(venda.id)" class="delete-button">Deletar</button>
-        </li>
-      </ul>
     </div>
   </main>
 </template>
 
 <style scoped>
-main { padding: 2rem; max-width: 600px; margin: 0 auto; }
+main { padding: 2rem; max-width: 800px; margin: 0 auto; }
 h1, h2 { margin-bottom: 1.5rem; }
 .form-container, .list-container { margin-top: 2rem; }
 .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
