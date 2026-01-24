@@ -3,20 +3,17 @@ import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 
-// --- ESTADO DO FORMULÁRIO ---
 const nome = ref('')
 const email = ref('')
 const telefone = ref('')
 const endereco = ref('')
-
-// --- ESTADO DA PÁGINA ---
 const clientes = ref([])
 const loading = ref(true)
 
-// --- FUNÇÕES ---
 async function buscarClientes() {
   loading.value = true
-  const { data } = await supabase.from('clientes').select('*').order('created_at', { ascending: false })
+  // APONTANDO PARA A NOVA TABELA 'clientes_v2'
+  const { data } = await supabase.from('clientes_v2').select('*').order('created_at', { ascending: false })
   if (data) clientes.value = data
   loading.value = false
 }
@@ -28,8 +25,8 @@ async function cadastrarCliente() {
     telefone: telefone.value,
     endereco: endereco.value 
   };
-
-  const { error } = await supabase.from('clientes').insert([clienteParaInserir]);
+  // APONTANDO PARA A NOVA TABELA 'clientes_v2'
+  const { error } = await supabase.from('clientes_v2').insert([clienteParaInserir]);
   
   if (error) {
     console.error('Erro ao cadastrar cliente:', error);
@@ -46,7 +43,8 @@ async function cadastrarCliente() {
 
 async function deletarCliente(idCliente) {
   if (!confirm('Tem certeza que deseja deletar este cliente?')) return;
-  const { error } = await supabase.from('clientes').delete().eq('id', idCliente)
+  // APONTANDO PARA A NOVA TABELA 'clientes_v2'
+  const { error } = await supabase.from('clientes_v2').delete().eq('id', idCliente)
   if (!error) await buscarClientes()
 }
 
@@ -58,9 +56,7 @@ onMounted(() => {
 <template>
   <main>
     <LoadingSpinner v-if="loading" />
-
     <h1>Cadastro de Clientes</h1>
-    
     <div v-if="!loading">
       <form @submit.prevent="cadastrarCliente" class="form-container">
         <div class="form-group">
@@ -69,7 +65,6 @@ onMounted(() => {
         </div>
         <div class="form-group">
           <label for="email">Email:</label>
-          <!-- ATRIBUTO 'required' REMOVIDO DA LINHA ABAIXO -->
           <input type="email" id="email" v-model="email" />
         </div>
         <div class="form-group">
@@ -82,7 +77,6 @@ onMounted(() => {
         </div>
         <button type="submit">Cadastrar Cliente</button>
       </form>
-
       <div class="list-container">
         <h2>Clientes Cadastrados</h2>
         <ul>
