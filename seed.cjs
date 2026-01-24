@@ -6,51 +6,81 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function seedDatabase() {
+  console.log('--- INICIANDO SCRIPT DE TESTE ---');
+
   try {
-    console.log("--- INICIANDO SCRIPT DE TESTE ---");
+    // 1. LIMPEZA FORÇADA DAS TABELAS
+    console.log('Limpando tabelas com TRUNCATE...');
+    // A função 'truncate' zera a tabela completamente.
+    // O 'CASCADE' garante que as dependências (vendas) sejam limpas primeiro.
+    const { error: truncateError } = await supabase.rpc('truncate_tables', {
+      tables: ['clientes_v2', 'produtos_v2', 'vendas']
+    });
+    if (truncateError) throw truncateError;
+    console.log('Tabelas limpas com sucesso.');
 
-    console.log("Limpando tabelas...");
-    await supabase.from('vendas').delete().neq('id', 0);
-    await supabase.from('clientes').delete().neq('id', 0);
-    await supabase.from('produtos_v2').delete().neq('id', 0); // MODIFICADO
-    console.log("Tabelas limpas com sucesso.");
+    // 2. Inserir clientes
+    console.log('Inserindo 5 clientes...');
+    const { error: insertClientesError } = await supabase
+      .from('clientes_v2')
+      .insert([
+        { nome: 'Ana Silva', email: 'ana.silva@example.com', telefone: '11987654321', endereco: 'Rua das Flores, 123, São Paulo, SP' },
+        { nome: 'Bruno Costa', email: 'bruno.costa@example.com', telefone: '21987654321', endereco: 'Avenida Atlântica, 456, Rio de Janeiro, RJ' },
+        { nome: 'Carla Dias', email: 'carla.dias@example.com', telefone: '31987654321', endereco: 'Praça da Liberdade, 789, Belo Horizonte, MG' },
+        { nome: 'Daniel Faria', email: 'daniel.faria@example.com', telefone: '41987654321', endereco: 'Rua XV de Novembro, 101, Curitiba, PR' },
+        { nome: 'Elisa Rocha', email: 'elisa.rocha@example.com', telefone: '51987654321', endereco: 'Avenida Borges de Medeiros, 202, Porto Alegre, RS' },
+      ]);
+    if (insertClientesError) throw insertClientesError;
 
-    console.log("Criando clientes...");
-    const { data: clientes } = await supabase.from('clientes').insert([
-      { nome: 'Ana Silva' }, { nome: 'Bruno Costa' }, { nome: 'Carla Dias' }, { nome: 'Daniel Faria' }, { nome: 'Elisa Borges' },
-    ]).select();
-    console.log(`${clientes.length} clientes criados com sucesso.`);
+    // 3. Buscar os 5 clientes que acabamos de inserir
+    const { data: clientes, error: selectClientesError } = await supabase.from('clientes_v2').select('id');
+    if (selectClientesError) throw selectClientesError;
+    if (!clientes || clientes.length !== 5) throw new Error(`A busca por clientes retornou ${clientes?.length} em vez de 5.`);
+    console.log(`${clientes.length} clientes encontrados com sucesso.`);
 
-    console.log("Criando produtos...");
-    const { data: produtos } = await supabase.from('produtos_v2').insert([ // MODIFICADO
-      { nome: 'Produto B1', categoria: 'B1' }, { nome: 'Produto B2', categoria: 'B2' }, { nome: 'Produto B3', categoria: 'B3' },
-    ]).select();
-    console.log(`${produtos.length} produtos criados com sucesso.`);
+    // 4. Inserir produtos
+    console.log('Inserindo 3 produtos...');
+    const { error: insertProdutosError } = await supabase
+      .from('produtos_v2')
+      .insert([
+        { nome: 'Morango Especial', categoria: 'B1' },
+        { nome: 'Morango Premium', categoria: 'B2' },
+        { nome: 'Morango Orgânico', categoria: 'B3' },
+      ]);
+    if (insertProdutosError) throw insertProdutosError;
 
-    console.log("Gerando 20 registros de vendas...");
+    // 5. Buscar os 3 produtos que acabamos de inserir
+    const { data: produtos, error: selectProdutosError } = await supabase.from('produtos_v2').select('id');
+    if (selectProdutosError) throw selectProdutosError;
+    if (!produtos || produtos.length !== 3) throw new Error(`A busca por produtos retornou ${produtos?.length} em vez de 3.`);
+    console.log(`${produtos.length} produtos encontrados com sucesso.`);
+
+    // 6. Gerar vendas usando os UUIDs reais
+    console.log('Gerando 20 registros de vendas...');
     const vendasParaInserir = [];
     for (let i = 0; i < 20; i++) {
       const clienteAleatorio = clientes[Math.floor(Math.random() * clientes.length)];
       const produtoAleatorio = produtos[Math.floor(Math.random() * produtos.length)];
-      const diasAtras = Math.floor(Math.random() * 15);
       const dataVenda = new Date();
-      dataVenda.setDate(dataVenda.getDate() - diasAtras);
+      dataVenda.setDate(dataVenda.getDate() - Math.floor(Math.random() * 14));
 
       vendasParaInserir.push({
         cliente_id: clienteAleatorio.id,
         produto_id: produtoAleatorio.id,
-        quantidade_caixas: Math.floor(Math.random() * 20) + 1,
+        quantidade_caixas: Math.floor(Math.random() * 5) + 1,
         created_at: dataVenda.toISOString(),
-        entregue: Math.random() > 0.5,
       });
     }
-    
-    await supabase.from('vendas').insert(vendasParaInserir);
-    console.log("20 vendas criadas com sucesso.");
-    console.log("--- SCRIPT CONCLUÍDO COM SUCESSO ---");
+
+    const { error: vendasError } = await supabase.from('vendas').insert(vendasParaInserir);
+    if (vendasError) throw vendasError;
+    console.log(`${vendasParaInserir.length} vendas criadas com sucesso.`);
+
+    console.log('--- SCRIPT CONCLUÍDO COM SUCESSO ---');
 
   } catch (error) {
-    console.error("### ERRO DURANTE A EXECUÇÃO DO SCRIPT ###", error);
+    console.error('### ERRO DURANTE A EXECUÇÃO DO SCRIPT ###');
+    console.error(error);
   }
 }
 
