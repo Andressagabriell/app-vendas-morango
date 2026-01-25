@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
 
-// --- ESTADO DO FORMULÁRIO ---
 const clientes = ref([])
 const produtos = ref([])
 const clienteId = ref('')
@@ -10,46 +9,20 @@ const produtoId = ref('')
 const quantidade = ref(1)
 const carregando = ref(false)
 
-// --- BUSCAR DADOS DO SUPABASE ---
 async function carregarDados() {
-  console.log('Carregando clientes e produtos...')
-  
-  // Busca clientes (Garante que pega o UUID da coluna 'id')
-  const { data: c, error: errC } = await supabase
-    .from('clientes_v2')
-    .select('id, nome')
-    .order('nome')
-  
-  if (errC) console.error('Erro ao buscar clientes:', errC)
-  else clientes.value = c
-
-  // Busca produtos (Garante que pega o UUID da coluna 'id')
-  const { data: p, error: errP } = await supabase
-    .from('produtos_v2')
-    .select('id, nome')
-    .order('nome')
-    
-  if (errP) console.error('Erro ao buscar produtos:', errP)
-  else produtos.value = p
+  const { data: c } = await supabase.from('clientes_v2').select('id, nome').order('nome')
+  if (c) clientes.value = c
+  const { data: p } = await supabase.from('produtos_v2').select('id, nome').order('nome')
+  if (p) produtos.value = p
 }
 
-// --- REGISTRAR A VENDA ---
 async function registrarVenda() {
-  // Validação básica
   if (!clienteId.value || !produtoId.value) {
-    alert('Por favor, selecione um cliente e um produto.')
+    alert('Selecione o cliente e o produto!')
     return
   }
 
   carregando.value = true
-  
-  // Log para você ver no console (F12) o que está sendo enviado
-  console.log('Enviando para o banco:', {
-    cliente_id: clienteId.value,
-    produto_id: produtoId.value,
-    quantidade: quantidade.value
-  })
-
   const { error } = await supabase.from('vendas').insert([
     {
       cliente_id: clienteId.value,
@@ -58,85 +31,61 @@ async function registrarVenda() {
       entregue: false
     }
   ])
-
   carregando.value = false
 
   if (error) {
-    console.error('Erro detalhado:', error)
-    alert('Falha ao registrar venda: ' + error.message)
+    alert('Erro ao registrar venda: ' + error.message)
   } else {
     alert('Venda registrada com sucesso!')
-    // Limpa os campos após o sucesso
     clienteId.value = ''
     produtoId.value = ''
     quantidade.value = 1
   }
 }
 
-// Carrega os dados assim que a página abre
-onMounted(() => {
-  carregarDados()
-})
+onMounted(() => carregarDados())
 </script>
 
 <template>
-  <main class="p-6 max-w-xl mx-auto">
-    <h1 class="text-2xl font-bold mb-6 text-red-600">Nova Venda</h1>
+  <main>
+    <h1>Registrar Nova Venda</h1>
 
-    <form @submit.prevent="registrarVenda" class="bg-white p-6 rounded-lg shadow-md border border-gray-200 space-y-4">
-      
-      <!-- Seleção de Cliente -->
-      <div>
-        <label class="block font-bold mb-1 text-gray-700">Cliente:</label>
-        <select v-model="clienteId" required class="w-full p-3 border rounded border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none">
+    <form @submit.prevent="registrarVenda" class="form-container">
+      <div class="form-group">
+        <label for="cliente">Cliente:</label>
+        <select id="cliente" v-model="clienteId" required>
           <option value="" disabled>Selecione o cliente</option>
-          <!-- O segredo está aqui: :value="c.id" garante que enviamos o UUID -->
-          <option v-for="c in clientes" :key="c.id" :value="c.id">
-            {{ c.nome }}
-          </option>
+          <option v-for="c in clientes" :key="c.id" :value="c.id">{{ c.nome }}</option>
         </select>
       </div>
 
-      <!-- Seleção de Produto -->
-      <div>
-        <label class="block font-bold mb-1 text-gray-700">Produto:</label>
-        <select v-model="produtoId" required class="w-full p-3 border rounded border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none">
+      <div class="form-group">
+        <label for="produto">Produto:</label>
+        <select id="produto" v-model="produtoId" required>
           <option value="" disabled>Selecione o produto</option>
-          <!-- O segredo está aqui: :value="p.id" garante que enviamos o UUID -->
-          <option v-for="p in produtos" :key="p.id" :value="p.id">
-            {{ p.nome }}
-          </option>
+          <option v-for="p in produtos" :key="p.id" :value="p.id">{{ p.nome }}</option>
         </select>
       </div>
 
-      <!-- Quantidade -->
-      <div>
-        <label class="block font-bold mb-1 text-gray-700">Quantidade (Caixas):</label>
-        <input 
-          type="number" 
-          v-model="quantidade" 
-          min="1" 
-          required 
-          class="w-full p-3 border rounded border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-        />
+      <div class="form-group">
+        <label for="quantidade">Quantidade (Caixas):</label>
+        <input type="number" id="quantidade" v-model="quantidade" min="1" required />
       </div>
 
-      <!-- Botão de Envio -->
-      <button 
-        type="submit" 
-        :disabled="carregando" 
-        class="w-full bg-blue-600 text-white py-3 rounded font-bold hover:bg-blue-700 transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-      >
-        {{ carregando ? 'Processando...' : 'Confirmar Venda' }}
+      <button type="submit" :disabled="carregando">
+        {{ carregando ? 'Registrando...' : 'Confirmar Venda' }}
       </button>
-
     </form>
   </main>
 </template>
 
 <style scoped>
-/* Estilos simples para melhorar a aparência */
-select, input {
-  transition: border-color 0.2s;
-}
+main { padding: 2rem; max-width: 600px; margin: 0 auto; }
+h1 { margin-bottom: 1.5rem; }
+.form-container { margin-top: 2rem; }
+.form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
+label { margin-bottom: 0.5rem; font-weight: bold; }
+input, select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; }
+button:disabled { background-color: #ccc; cursor: not-allowed; }
 </style>
