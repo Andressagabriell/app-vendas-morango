@@ -2,45 +2,114 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
 
+// --- ESTADO ---
 const clientes = ref([])
 const produtos = ref([])
-const clienteId = ref('')
-const produtoId = ref('')
-const quantidade = ref(1)
+const vendas = ref([])
 const carregando = ref(false)
+const editando = ref(false)
+const idVendaEmEdicao = ref(null)
 
+// --- FORMULÁRIO ---
+const form = ref({
+  cliente_id: '',
+  produto_id: '',
+  quantidade_caixas: 1
+})
+
+// --- FUNÇÕES ---
 async function carregarDados() {
   const { data: c } = await supabase.from('clientes_v2').select('id, nome').order('nome')
   if (c) clientes.value = c
+  
   const { data: p } = await supabase.from('produtos_v2').select('id, nome').order('nome')
   if (p) produtos.value = p
+
+  buscarVendas()
 }
 
-async function registrarVenda() {
-  if (!clienteId.value || !produtoId.value) {
-    alert('Selecione o cliente e o produto!')
-    return
-  }
+async function buscarVendas() {
+  const { data } = await supabase
+    .from('vendas')
+    .select(`
+      id, 
+      quantidade_caixas, 
+      cliente_id, 
+      produto_id,
+      clientes_v2 (nome),
+      produtos_v2 (nome)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(10) // Mostra as últimas 10 vendas para não poluir a tela
+  if (data) vendas.value = data
+}
 
+async function salvarVenda() {
+  if (!form.value.cliente_id || !form.value.produto_id) return alert('Selecione o cliente e o produto!')
   carregando.value = true
-  const { error } = await supabase.from('vendas').insert([
-    {
-      cliente_id: clienteId.value,
-      produto_id: produtoId.value,
-      quantidade_caixas: Number(quantidade.value),
-      entregue: false
-    }
-  ])
-  carregando.value = false
 
-  if (error) {
-    alert('Erro ao registrar venda: ' + error.message)
+  if (editando.value) {
+    // ATUALIZAR VENDA EXISTENTE
+    const { error } = await supabase
+      .from('vendas')
+      .update({
+        cliente_id: form.value.cliente_id,
+        produto_id: form.value.produto_id,
+        quantidade_caixas: Number(form.value.quantidade_caixas)
+      })
+      .eq('id', idVendaEmEdicao.value)
+
+    if (!error) {
+      alert('Venda atualizada com sucesso!')
+      cancelarEdicao()
+    } else {
+      alert('Erro ao atualizar: ' + error.message)
+    }
   } else {
-    alert('Venda registrada com sucesso!')
-    clienteId.value = ''
-    produtoId.value = ''
-    quantidade.value = 1
+    // REGISTRAR NOVA VENDA
+    const { error } = await supabase.from('vendas').insert([{
+      cliente_id: form.value.cliente_id,
+      produto_id: form.value.produto_id,
+      quantidade_caixas: Number(form.value.quantidade_caixas),
+      entregue: false
+    }])
+    if (!error) {
+      alert('Venda registrada com sucesso!')
+      limparFormulario()
+    } else {
+      alert('Erro ao registrar: ' + error.message)
+    }
   }
+
+  await buscarVendas()
+  carregando.value = false
+}
+
+function prepararEdicao(venda) {
+  editando.value = true
+  idVendaEmEdicao.value = venda.id
+  form.value = {
+    cliente_id: venda.cliente_id,
+    produto_id: venda.produto_id,
+    quantidade_caixas: venda.quantidade_caixas
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function cancelarEdicao() {
+  editando.value = false
+  idVendaEmEdicao.value = null
+  limparFormulario()
+}
+
+function limparFormulario() {
+  form.value = { cliente_id: '', produto_id: '', quantidade_caixas: 1 }
+}
+
+async function deletarVenda(id) {
+  if (!confirm('Tem certeza que deseja remover esta venda?')) return
+  const { error } = await supabase.from('vendas').delete().eq('id', id)
+  if (!error) await buscarVendas()
 }
 
 onMounted(() => carregarDados())
@@ -48,44 +117,81 @@ onMounted(() => carregarDados())
 
 <template>
   <main>
-    <h1>Registrar Nova Venda</h1>
+    <h1>{{ editando ? 'Editar Venda' : 'Registrar Nova Venda' }}</h1>
 
-    <form @submit.prevent="registrarVenda" class="form-container">
+    <form @submit.prevent="salvarVenda" class="form-container">
       <div class="form-group">
-        <label for="cliente">Cliente:</label>
-        <select id="cliente" v-model="clienteId" required>
+        <label>Cliente:</label>
+        <select v-model="form.cliente_id" required>
           <option value="" disabled>Selecione o cliente</option>
           <option v-for="c in clientes" :key="c.id" :value="c.id">{{ c.nome }}</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label for="produto">Produto:</label>
-        <select id="produto" v-model="produtoId" required>
+        <label>Produto:</label>
+        <select v-model="form.produto_id" required>
           <option value="" disabled>Selecione o produto</option>
           <option v-for="p in produtos" :key="p.id" :value="p.id">{{ p.nome }}</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label for="quantidade">Quantidade (Caixas):</label>
-        <input type="number" id="quantidade" v-model="quantidade" min="1" required />
+        <label>Quantidade (Caixas):</label>
+        <input type="number" v-model="form.quantidade_caixas" min="1" required />
       </div>
 
-      <button type="submit" :disabled="carregando">
-        {{ carregando ? 'Registrando...' : 'Confirmar Venda' }}
-      </button>
+      <div class="botoes-form">
+        <button type="submit" :disabled="carregando" :class="{ 'btn-edit': editando }">
+          {{ editando ? 'Salvar Alterações' : 'Confirmar Venda' }}
+        </button>
+        <button v-if="editando" type="button" @click="cancelarEdicao" class="btn-cancelar">
+          Cancelar
+        </button>
+      </div>
     </form>
+
+    <div class="list-container">
+      <h2>Últimas Vendas</h2>
+      <ul>
+        <li v-for="v in vendas" :key="v.id">
+          <div class="info-venda">
+            <strong>{{ v.clientes_v2?.nome }}</strong>
+            <small>{{ v.produtos_v2?.nome }} - {{ v.quantidade_caixas }} caixas</small>
+          </div>
+          <div class="acoes-lista">
+            <button @click="prepararEdicao(v)" class="edit-button">Editar</button>
+            <button @click="deletarVenda(v.id)" class="delete-button">Deletar</button>
+          </div>
+        </li>
+        <li v-if="vendas.length === 0" class="empty">Nenhuma venda registrada.</li>
+      </ul>
+    </div>
   </main>
 </template>
 
 <style scoped>
 main { padding: 2rem; max-width: 600px; margin: 0 auto; }
-h1 { margin-bottom: 1.5rem; }
-.form-container { margin-top: 2rem; }
+h1, h2 { margin-bottom: 1.5rem; }
+.form-container, .list-container { margin-top: 2rem; }
 .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
 label { margin-bottom: 0.5rem; font-weight: bold; }
-input, select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+input, select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+
+.botoes-form { display: flex; gap: 1rem; }
 button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; }
 button:disabled { background-color: #ccc; cursor: not-allowed; }
+.btn-edit { background-color: #4285f4; }
+.btn-cancelar { background-color: #666; }
+
+.acoes-lista { display: flex; gap: 0.5rem; }
+.edit-button { background-color: #4285f4; padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; }
+.delete-button { background-color: #e53e3e; padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; }
+
+ul { list-style: none; padding: 0; }
+li { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; background: white; }
+.info-venda { display: flex; flex-direction: column; }
+.info-venda strong { font-size: 1.1rem; }
+.info-venda small { color: #666; }
+.empty { justify-content: center; color: #999; font-style: italic; }
 </style>
