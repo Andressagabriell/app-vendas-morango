@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
 
 // --- ESTADO ---
@@ -9,13 +9,21 @@ const vendas = ref([])
 const carregando = ref(false)
 const editando = ref(false)
 const idVendaEmEdicao = ref(null)
+const buscaCliente = ref('') // Para a barra de busca
 
 // --- FORMULÁRIO ---
 const form = ref({
-  cliente_nome: '', // Usamos o nome para a busca
-  cliente_id: '',   // Guardamos o ID para o banco
+  cliente_id: '',
   produto_id: '',
   quantidade_caixas: 1
+})
+
+// --- LÓGICA DE BUSCA ---
+const clientesFiltrados = computed(() => {
+  if (!buscaCliente.value) return clientes.value
+  return clientes.value.filter(c => 
+    c.nome.toLowerCase().includes(buscaCliente.value.toLowerCase())
+  )
 })
 
 // --- FUNÇÕES ---
@@ -45,46 +53,27 @@ async function buscarVendas() {
   if (data) vendas.value = data
 }
 
-// Função para vincular o ID quando o nome é selecionado na busca
-function atualizarClienteId() {
-  const clienteEncontrado = clientes.value.find(c => c.nome === form.value.cliente_nome)
-  if (clienteEncontrado) {
-    form.value.cliente_id = clienteEncontrado.id
-  } else {
-    form.value.cliente_id = ''
-  }
-}
-
 async function salvarVenda() {
-  atualizarClienteId() // Garante que o ID está certo antes de salvar
-
-  if (!form.value.cliente_id || !form.value.produto_id) {
-    return alert('Por favor, selecione um cliente da lista e um produto!')
-  }
-  
+  if (!form.value.cliente_id || !form.value.produto_id) return alert('Selecione o cliente e o produto!')
   carregando.value = true
 
-  const dadosVenda = {
+  const dados = {
     cliente_id: form.value.cliente_id,
     produto_id: form.value.produto_id,
     quantidade_caixas: Number(form.value.quantidade_caixas)
   }
 
   if (editando.value) {
-    const { error } = await supabase.from('vendas').update(dadosVenda).eq('id', idVendaEmEdicao.value)
+    const { error } = await supabase.from('vendas').update(dados).eq('id', idVendaEmEdicao.value)
     if (!error) {
       alert('Venda atualizada!')
       cancelarEdicao()
-    } else {
-      alert('Erro: ' + error.message)
     }
   } else {
-    const { error } = await supabase.from('vendas').insert([{ ...dadosVenda, entregue: false }])
+    const { error } = await supabase.from('vendas').insert([{ ...dados, entregue: false }])
     if (!error) {
       alert('Venda registrada!')
       limparFormulario()
-    } else {
-      alert('Erro: ' + error.message)
     }
   }
 
@@ -96,7 +85,6 @@ function prepararEdicao(venda) {
   editando.value = true
   idVendaEmEdicao.value = venda.id
   form.value = {
-    cliente_nome: venda.clientes_v2?.nome || '',
     cliente_id: venda.cliente_id,
     produto_id: venda.produto_id,
     quantidade_caixas: venda.quantidade_caixas
@@ -111,7 +99,8 @@ function cancelarEdicao() {
 }
 
 function limparFormulario() {
-  form.value = { cliente_nome: '', cliente_id: '', produto_id: '', quantidade_caixas: 1 }
+  form.value = { cliente_id: '', produto_id: '', quantidade_caixas: 1 }
+  buscaCliente.value = ''
 }
 
 async function deletarVenda(id) {
@@ -128,22 +117,23 @@ onMounted(() => carregarDados())
     <h1>{{ editando ? 'Editar Venda' : 'Registrar Nova Venda' }}</h1>
 
     <form @submit.prevent="salvarVenda" class="form-container">
-      
-      <!-- BUSCA DE CLIENTE COM AUTO-COMPLETAR -->
+      <!-- BARRA DE BUSCA (Estilizada) -->
       <div class="form-group">
-        <label>Cliente (Digite para buscar):</label>
+        <label>Buscar Cliente:</label>
         <input 
-          list="lista-clientes" 
-          v-model="form.cliente_nome" 
-          @input="atualizarClienteId"
-          placeholder="Comece a digitar o nome..."
-          required
+          type="text" 
+          v-model="buscaCliente" 
+          placeholder="Digite o nome para filtrar..." 
+          class="search-input"
         />
-        <datalist id="lista-clientes">
-          <option v-for="c in clientes" :key="c.id" :value="c.nome"></option>
-        </datalist>
-        <small v-if="form.cliente_id" class="success-msg">✓ Cliente selecionado</small>
-        <small v-else-if="form.cliente_nome" class="error-msg">⚠ Selecione um nome da lista</small>
+      </div>
+
+      <div class="form-group">
+        <label>Selecionar Cliente:</label>
+        <select v-model="form.cliente_id" required>
+          <option value="" disabled>Selecione o cliente</option>
+          <option v-for="c in clientesFiltrados" :key="c.id" :value="c.id">{{ c.nome }}</option>
+        </select>
       </div>
 
       <div class="form-group">
@@ -188,19 +178,20 @@ onMounted(() => carregarDados())
 </template>
 
 <style scoped>
-main { padding: 2rem; max-width: 600px; margin: 0 auto; }
-h1, h2 { margin-bottom: 1.5rem; }
+/* RESTAURANDO O VISUAL PADRÃO QUE VOCÊ GOSTA */
+main { padding: 2rem; max-width: 600px; margin: 0 auto; font-family: sans-serif; }
+h1, h2 { margin-bottom: 1.5rem; color: #333; }
 .form-container, .list-container { margin-top: 2rem; }
 .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
-label { margin-bottom: 0.5rem; font-weight: bold; }
+label { margin-bottom: 0.5rem; font-weight: bold; color: #444; }
 input, select { padding: 0.7rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
 
-.success-msg { color: #28a745; font-size: 0.8rem; margin-top: 0.3rem; }
-.error-msg { color: #dc3545; font-size: 0.8rem; margin-top: 0.3rem; }
+/* Estilo da barra de busca */
+.search-input { background-color: #f0fdf4; border: 1px dashed hsla(160, 100%, 37%, 1); margin-bottom: 0.5rem; }
 
 .botoes-form { display: flex; gap: 1rem; }
-button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; }
-button:disabled { background-color: #ccc; }
+button { padding: 0.8rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem; }
+button:disabled { background-color: #ccc; cursor: not-allowed; }
 .btn-edit { background-color: #4285f4; }
 .btn-cancelar { background-color: #666; }
 
@@ -211,6 +202,6 @@ button:disabled { background-color: #ccc; }
 ul { list-style: none; padding: 0; }
 li { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; background: white; }
 .info-venda { display: flex; flex-direction: column; }
-.info-venda strong { font-size: 1.1rem; }
-.info-venda small { color: #666; }
+.info-venda strong { font-size: 1.1rem; color: #222; }
+.info-venda small { color: #666; margin-top: 0.2rem; }
 </style>
