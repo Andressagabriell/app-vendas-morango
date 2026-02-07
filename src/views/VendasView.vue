@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
 
 // --- ESTADO ---
@@ -9,12 +9,21 @@ const vendas = ref([])
 const carregando = ref(false)
 const editando = ref(false)
 const idVendaEmEdicao = ref(null)
+const buscaCliente = ref('') // Estado para a barra de busca
 
 // --- FORMULÁRIO ---
 const form = ref({
   cliente_id: '',
   produto_id: '',
   quantidade_caixas: 1
+})
+
+// --- FILTRO DE CLIENTES ---
+const clientesFiltrados = computed(() => {
+  if (!buscaCliente.value) return clientes.value
+  return clientes.value.filter(c => 
+    c.nome.toLowerCase().includes(buscaCliente.value.toLowerCase())
+  )
 })
 
 // --- FUNÇÕES ---
@@ -40,7 +49,7 @@ async function buscarVendas() {
       produtos_v2 (nome)
     `)
     .order('created_at', { ascending: false })
-    .limit(10) // Mostra as últimas 10 vendas para não poluir a tela
+    .limit(10)
   if (data) vendas.value = data
 }
 
@@ -49,7 +58,6 @@ async function salvarVenda() {
   carregando.value = true
 
   if (editando.value) {
-    // ATUALIZAR VENDA EXISTENTE
     const { error } = await supabase
       .from('vendas')
       .update({
@@ -66,7 +74,6 @@ async function salvarVenda() {
       alert('Erro ao atualizar: ' + error.message)
     }
   } else {
-    // REGISTRAR NOVA VENDA
     const { error } = await supabase.from('vendas').insert([{
       cliente_id: form.value.cliente_id,
       produto_id: form.value.produto_id,
@@ -104,6 +111,7 @@ function cancelarEdicao() {
 
 function limparFormulario() {
   form.value = { cliente_id: '', produto_id: '', quantidade_caixas: 1 }
+  buscaCliente.value = ''
 }
 
 async function deletarVenda(id) {
@@ -120,11 +128,24 @@ onMounted(() => carregarDados())
     <h1>{{ editando ? 'Editar Venda' : 'Registrar Nova Venda' }}</h1>
 
     <form @submit.prevent="salvarVenda" class="form-container">
+      <!-- Barra de Busca de Cliente -->
       <div class="form-group">
-        <label>Cliente:</label>
+        <label>Buscar Cliente:</label>
+        <input 
+          type="text" 
+          v-model="buscaCliente" 
+          placeholder="Digite o nome para filtrar..." 
+          class="search-input"
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Selecionar Cliente:</label>
         <select v-model="form.cliente_id" required>
-          <option value="" disabled>Selecione o cliente</option>
-          <option v-for="c in clientes" :key="c.id" :value="c.id">{{ c.nome }}</option>
+          <option value="" disabled>
+            {{ clientesFiltrados.length > 0 ? 'Selecione o cliente' : 'Nenhum cliente encontrado' }}
+          </option>
+          <option v-for="c in clientesFiltrados" :key="c.id" :value="c.id">{{ c.nome }}</option>
         </select>
       </div>
 
@@ -177,6 +198,12 @@ h1, h2 { margin-bottom: 1.5rem; }
 .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
 label { margin-bottom: 0.5rem; font-weight: bold; }
 input, select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+
+.search-input {
+  background-color: #f9f9f9;
+  border-style: dashed;
+  margin-bottom: 0.5rem;
+}
 
 .botoes-form { display: flex; gap: 1rem; }
 button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; }
