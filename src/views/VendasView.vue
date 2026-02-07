@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
 
 // --- ESTADO ---
@@ -9,7 +9,7 @@ const vendas = ref([])
 const carregando = ref(false)
 const editando = ref(false)
 const idVendaEmEdicao = ref(null)
-const buscaCliente = ref('') // Para a barra de busca
+const buscaCliente = ref('') 
 
 // --- FORMULÁRIO ---
 const form = ref({
@@ -18,12 +18,21 @@ const form = ref({
   quantidade_caixas: 1
 })
 
-// --- LÓGICA DE BUSCA ---
+// --- LÓGICA DE BUSCA MELHORADA ---
 const clientesFiltrados = computed(() => {
-  if (!buscaCliente.value) return clientes.value
+  const termo = buscaCliente.value.trim().toLowerCase()
+  if (!termo) return clientes.value
+  
   return clientes.value.filter(c => 
-    c.nome.toLowerCase().includes(buscaCliente.value.toLowerCase())
+    c.nome.toLowerCase().includes(termo)
   )
+})
+
+// Monitora a busca: se sobrar apenas 1 cliente, seleciona ele automaticamente
+watch(clientesFiltrados, (novosFiltrados) => {
+  if (novosFiltrados.length === 1 && !editando.value) {
+    form.value.cliente_id = novosFiltrados[0].id
+  }
 })
 
 // --- FUNÇÕES ---
@@ -89,6 +98,7 @@ function prepararEdicao(venda) {
     produto_id: venda.produto_id,
     quantidade_caixas: venda.quantidade_caixas
   }
+  buscaCliente.value = '' // Limpa busca ao editar para mostrar todos
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -117,15 +127,18 @@ onMounted(() => carregarDados())
     <h1>{{ editando ? 'Editar Venda' : 'Registrar Nova Venda' }}</h1>
 
     <form @submit.prevent="salvarVenda" class="form-container">
-      <!-- BARRA DE BUSCA (Estilizada) -->
+      <!-- BARRA DE BUSCA -->
       <div class="form-group">
-        <label>Buscar Cliente:</label>
+        <label>Buscar Cliente por Nome:</label>
         <input 
           type="text" 
           v-model="buscaCliente" 
-          placeholder="Digite o nome para filtrar..." 
+          placeholder="Digite para filtrar a lista abaixo..." 
           class="search-input"
         />
+        <small v-if="buscaCliente" class="filter-info">
+          {{ clientesFiltrados.length }} cliente(s) encontrado(s)
+        </small>
       </div>
 
       <div class="form-group">
@@ -178,7 +191,6 @@ onMounted(() => carregarDados())
 </template>
 
 <style scoped>
-/* RESTAURANDO O VISUAL PADRÃO QUE VOCÊ GOSTA */
 main { padding: 2rem; max-width: 600px; margin: 0 auto; font-family: sans-serif; }
 h1, h2 { margin-bottom: 1.5rem; color: #333; }
 .form-container, .list-container { margin-top: 2rem; }
@@ -186,8 +198,8 @@ h1, h2 { margin-bottom: 1.5rem; color: #333; }
 label { margin-bottom: 0.5rem; font-weight: bold; color: #444; }
 input, select { padding: 0.7rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
 
-/* Estilo da barra de busca */
-.search-input { background-color: #f0fdf4; border: 1px dashed hsla(160, 100%, 37%, 1); margin-bottom: 0.5rem; }
+.search-input { background-color: #f0fdf4; border: 1px dashed hsla(160, 100%, 37%, 1); }
+.filter-info { color: hsla(160, 100%, 37%, 1); font-size: 0.8rem; margin-top: 0.2rem; font-weight: bold; }
 
 .botoes-form { display: flex; gap: 1rem; }
 button { padding: 0.8rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem; }
