@@ -1,109 +1,166 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient.js'
-import LoadingSpinner from '../components/LoadingSpinner.vue'
 
-const nome = ref('')
-const email = ref('')
-const telefone = ref('')
-const endereco = ref('')
+// --- ESTADO ---
 const clientes = ref([])
-const loading = ref(true)
+const carregando = ref(false)
+const editando = ref(false)
+const idClienteEmEdicao = ref(null)
 
+// --- FORMULÁRIO ---
+const form = ref({
+  nome: '',
+  email: '',
+  telefone: '',
+  endereco: ''
+})
+
+// --- FUNÇÕES ---
 async function buscarClientes() {
-  loading.value = true
-  // APONTANDO PARA A NOVA TABELA 'clientes_v2'
-  const { data } = await supabase.from('clientes_v2').select('*').order('created_at', { ascending: false })
+  const { data } = await supabase.from('clientes_v2').select('*').order('nome')
   if (data) clientes.value = data
-  loading.value = false
 }
 
-async function cadastrarCliente() {
-  const clienteParaInserir = { 
-    nome: nome.value, 
-    email: email.value, 
-    telefone: telefone.value,
-    endereco: endereco.value 
-  };
-  // APONTANDO PARA A NOVA TABELA 'clientes_v2'
-  const { error } = await supabase.from('clientes_v2').insert([clienteParaInserir]);
-  
-  if (error) {
-    console.error('Erro ao cadastrar cliente:', error);
-    alert(`Falha ao cadastrar: ${error.message}`);
+async function salvarCliente() {
+  if (!form.value.nome) return alert('O nome é obrigatório!')
+  carregando.value = true
+
+  if (editando.value) {
+    // ATUALIZAR CLIENTE EXISTENTE
+    const { error } = await supabase
+      .from('clientes_v2')
+      .update({
+        nome: form.value.nome,
+        email: form.value.email,
+        telefone: form.value.telefone,
+        endereco: form.value.endereco
+      })
+      .eq('id', idClienteEmEdicao.value)
+
+    if (!error) {
+      alert('Cliente atualizado com sucesso!')
+      cancelarEdicao()
+    } else {
+      alert('Erro ao atualizar: ' + error.message)
+    }
   } else {
-    nome.value = ''
-    email.value = ''
-    telefone.value = ''
-    endereco.value = ''
-    await buscarClientes()
-    alert('Cliente cadastrado com sucesso!');
+    // CADASTRAR NOVO CLIENTE
+    const { error } = await supabase.from('clientes_v2').insert([form.value])
+    if (!error) {
+      alert('Cliente cadastrado com sucesso!')
+      limparFormulario()
+    } else {
+      alert('Erro ao cadastrar: ' + error.message)
+    }
   }
+
+  await buscarClientes()
+  carregando.value = false
 }
 
-async function deletarCliente(idCliente) {
-  if (!confirm('Tem certeza que deseja deletar este cliente?')) return;
-  // APONTANDO PARA A NOVA TABELA 'clientes_v2'
-  const { error } = await supabase.from('clientes_v2').delete().eq('id', idCliente)
+function prepararEdicao(cliente) {
+  editando.value = true
+  idClienteEmEdicao.value = cliente.id
+  form.value = { ...cliente }
+  // Rola a página para o topo para facilitar a edição
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function cancelarEdicao() {
+  editando.value = false
+  idClienteEmEdicao.value = null
+  limparFormulario()
+}
+
+function limparFormulario() {
+  form.value = { nome: '', email: '', telefone: '', endereco: '' }
+}
+
+async function deletarCliente(id) {
+  if (!confirm('Tem certeza que deseja remover este cliente?')) return
+  const { error } = await supabase.from('clientes_v2').delete().eq('id', id)
   if (!error) await buscarClientes()
 }
 
-onMounted(() => {
-  buscarClientes()
-})
+onMounted(() => buscarClientes())
 </script>
 
 <template>
   <main>
-    <LoadingSpinner v-if="loading" />
-    <h1>Cadastro de Clientes</h1>
-    <div v-if="!loading">
-      <form @submit.prevent="cadastrarCliente" class="form-container">
-        <div class="form-group">
-          <label for="nome">Nome:</label>
-          <input type="text" id="nome" v-model="nome" required />
-        </div>
-        <div class="form-group">
-          <label for="email">Email:</label>
-          <input type="email" id="email" v-model="email" />
-        </div>
-        <div class="form-group">
-          <label for="telefone">Telefone:</label>
-          <input type="tel" id="telefone" v-model="telefone" />
-        </div>
-        <div class="form-group">
-          <label for="endereco">Endereço:</label>
-          <input type="text" id="endereco" v-model="endereco" />
-        </div>
-        <button type="submit">Cadastrar Cliente</button>
-      </form>
-      <div class="list-container">
-        <h2>Clientes Cadastrados</h2>
-        <ul>
-          <li v-for="cliente in clientes" :key="cliente.id">
-            <div class="cliente-info">
-              <strong>{{ cliente.nome }}</strong>
-              <span>{{ cliente.endereco || 'Sem endereço' }}</span>
-            </div>
-            <button @click="deletarCliente(cliente.id)" class="delete-button">Deletar</button>
-          </li>
-        </ul>
+    <h1>{{ editando ? 'Editar Cliente' : 'Cadastro de Clientes' }}</h1>
+    
+    <form @submit.prevent="salvarCliente" class="form-container">
+      <div class="form-group">
+        <label>Nome:</label>
+        <input type="text" v-model="form.nome" required placeholder="Nome completo" />
       </div>
+      
+      <div class="form-group">
+        <label>Telefone:</label>
+        <input type="text" v-model="form.telefone" placeholder="(00) 00000-0000" />
+      </div>
+
+      <div class="form-group">
+        <label>E-mail:</label>
+        <input type="email" v-model="form.email" placeholder="exemplo@email.com" />
+      </div>
+
+      <div class="form-group">
+        <label>Endereço:</label>
+        <input type="text" v-model="form.endereco" placeholder="Rua, número, bairro..." />
+      </div>
+
+      <div class="botoes-form">
+        <button type="submit" :disabled="carregando" :class="{ 'btn-edit': editando }">
+          {{ editando ? 'Salvar Alterações' : 'Cadastrar Cliente' }}
+        </button>
+        <button v-if="editando" type="button" @click="cancelarEdicao" class="btn-cancelar">
+          Cancelar
+        </button>
+      </div>
+    </form>
+
+    <div class="list-container">
+      <h2>Clientes Cadastrados</h2>
+      <ul>
+        <li v-for="c in clientes" :key="c.id">
+          <div class="info-cliente">
+            <strong>{{ c.nome }}</strong>
+            <small>{{ c.telefone }}</small>
+          </div>
+          <div class="acoes-lista">
+            <button @click="prepararEdicao(c)" class="edit-button">Editar</button>
+            <button @click="deletarCliente(c.id)" class="delete-button">Deletar</button>
+          </div>
+        </li>
+        <li v-if="clientes.length === 0" class="empty">Nenhum cliente cadastrado.</li>
+      </ul>
     </div>
   </main>
 </template>
 
 <style scoped>
-main { position: relative; padding: 2rem; max-width: 800px; margin: 0 auto; }
+main { padding: 2rem; max-width: 600px; margin: 0 auto; }
 h1, h2 { margin-bottom: 1.5rem; }
 .form-container, .list-container { margin-top: 2rem; }
 .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
-label { margin-bottom: 0.5rem; font-weight: bold; }
-input { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
-button { padding: 0.75rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; }
-.delete-button { background-color: #e53e3e; padding: 0.4rem 0.8rem; font-size: 0.8rem; margin-left: 1rem; }
+label { margin-bottom: 0.3rem; font-weight: bold; }
+input { padding: 0.6rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+
+.botoes-form { display: flex; gap: 1rem; }
+button { padding: 0.8rem; border: none; border-radius: 4px; background-color: hsla(160, 100%, 37%, 1); color: white; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem; }
+.btn-edit { background-color: #4285f4; }
+.btn-cancelar { background-color: #666; }
+
+.acoes-lista { display: flex; gap: 0.5rem; }
+.edit-button { background-color: #4285f4; padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; }
+.delete-button { background-color: #e53e3e; padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; }
+
 ul { list-style: none; padding: 0; }
-li { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; }
-.cliente-info { display: flex; flex-direction: column; flex-grow: 1; }
-.cliente-info span { font-size: 0.9rem; color: #666; margin-top: 0.25rem; }
+li { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; background: white; }
+.info-cliente { display: flex; flex-direction: column; }
+.info-cliente strong { font-size: 1.1rem; }
+.info-cliente small { color: #666; }
+.empty { justify-content: center; color: #999; font-style: italic; }
 </style>
